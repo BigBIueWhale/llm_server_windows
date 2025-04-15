@@ -82,6 +82,7 @@ if (Test-Path $destOllama) {
         Show-ErrorAndWait "Error removing existing .ollama folder at '$destOllama'. Error details: $_" "Removal Error"
     }
 }
+Write-Host "Copying... $sourceOllama to $destOllama"
 try {
     Copy-Item -Path $sourceOllama -Destination $destOllama -Recurse -Force -ErrorAction Stop
 } catch {
