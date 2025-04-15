@@ -67,6 +67,7 @@ function Start-Ollama {
     $psi.Arguments = "/c $cmd"
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
+    $psi.WorkingDirectory = $ollamaPath
     
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $psi
