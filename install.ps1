@@ -85,6 +85,7 @@ if (Test-Path $destOllama) {
 Write-Host "Copying... $sourceOllama to $destOllama"
 try {
     Copy-Item -Path $sourceOllama -Destination $destOllama -Recurse -Force -ErrorAction Stop
+    Write-Host "Successfully copied models."
 } catch {
     Show-ErrorAndWait "Error copying .ollama folder to '$destOllama'. Error details: $_" "Copy Error"
 }
