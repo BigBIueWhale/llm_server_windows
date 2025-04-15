@@ -32,6 +32,15 @@ if (-not $isAdmin) {
     Log-Error "This script is not running as an Administrator. Some operations may fail due to insufficient privileges." "Insufficient Privileges"
 }
 
+# Remove the scheduled startup task.
+Write-Host "Removing scheduled task 'OllamaOnStartup'..."
+schtasks.exe /Delete /TN "OllamaOnStartup" /F | Out-Null
+if ($LastExitCode -ne 0) {
+    Log-Error "Error removing scheduled task 'OllamaOnStartup'. Exit code: $LastExitCode" "Task Removal Error"
+} else {
+    Write-Host "Scheduled task removed successfully."
+}
+
 # Kill any running instances of "ollama.exe" and "ollama app.exe".
 try {
     Get-Process -Name "ollama" -ErrorAction SilentlyContinue | ForEach-Object { 
@@ -44,15 +53,6 @@ try {
     }
 } catch {
     Log-Error "Error stopping one or more processes: $_" "Process Termination Error"
-}
-
-# Remove the scheduled startup task.
-Write-Host "Removing scheduled task 'OllamaOnStartup'..."
-schtasks.exe /Delete /TN "OllamaOnStartup" /F | Out-Null
-if ($LastExitCode -ne 0) {
-    Log-Error "Error removing scheduled task 'OllamaOnStartup'. Exit code: $LastExitCode" "Task Removal Error"
-} else {
-    Write-Host "Scheduled task removed successfully."
 }
 
 # Remove the startup shortcut, if it exists.
