@@ -1,1 +1,8 @@
+# Download and place in root directory:
 /OllamaSetup.exe
+
+# Create with `ollama pull` on an online PC and place in root directory:
+/.ollama
+
+# Automatically created by on_startup.ps1
+/logs
