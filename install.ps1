@@ -61,10 +61,9 @@ if (Test-Path $ollamaShortcut) {
 # The task action sets the current directory to the project folder.
 $projectPath = $PSScriptRoot
 $taskName = "OllamaOnStartup"
-# Build the command that the scheduled task will execute.
-$cmd = "Set-Location '$projectPath'; & '$projectPath\on_startup.ps1'"
-# Note the backtick-escaped double quotes to enclose the command properly.
-$action = "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command `"$cmd`""
+# Build the command that the scheduled task will execute by invoking cmd.exe to change to the project folder
+# and then running the on_startup.ps1 script.
+$action = "cmd.exe /c cd /d `"$projectPath`" && powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$projectPath\on_startup.ps1`""
 Write-Host "Creating scheduled task..."
 # Execute schtasks.exe and capture output, including error messages.
 $taskResult = schtasks.exe /Create /TN $taskName /SC ONSTART /RL HIGHEST /RU "SYSTEM" /TR $action /F 2>&1
