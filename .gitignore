@@ -4,5 +4,8 @@
 # Create with `ollama pull` on an online PC and place in root directory:
 /.ollama
 
+# Automatically created by install.ps1
+/.username.txt
+
 # Automatically created by on_startup.ps1
 /logs
