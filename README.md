@@ -34,6 +34,7 @@ Double-click `double_click_uninstall.bat` (requires admin privileges).
   - **Execution:** Changes directory to `C:\Users\<username>\AppData\Local\Programs\Ollama` and launches `ollama.exe serve`.
   - **Output Redirection:** Pipes the output and error streams to a timestamped log file in the `logs` folder.
   - **Error Logging:** Any error encountered before the main log file is set up is written into a temporary fallback log file at `C:\llm_log.txt`.
+  - **Kill-revive loop** For robustness, kills Ollama (attempts to kill gracefully) and relaunches it continuously forever at the configured minute(s) within the hour. Can be configured by editing `$restartMinutes = @(0)`.
 
 ## Absolute Paths & Key Directories
 
