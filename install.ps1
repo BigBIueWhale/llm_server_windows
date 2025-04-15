@@ -31,11 +31,11 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 Get-Process -Name "ollama" -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process $_.Id -Force }
 Get-Process -Name "ollama app" -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process $_.Id -Force }
 
-# Run the installer (OllamaSetup.exe) as the current user and wait for completion.
+# Run the installer (OllamaSetup.exe) as the current user in a detached background process.
 $installerPath = Join-Path $PSScriptRoot "OllamaSetup.exe"
 if (Test-Path $installerPath) {
-    Write-Host "Starting installation..."
-    Start-Process -FilePath $installerPath -Wait
+    Write-Host "Starting installation in detached mode..."
+    Start-Process -FilePath $installerPath
 } else {
     Show-ErrorAndWait "Installer not found at $installerPath" "Installer Error"
 }
