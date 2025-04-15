@@ -45,9 +45,9 @@ Write-Log "Changed directory to Ollama installation: $ollamaPath"
 # CONFIGURATION
 # *******************************
 # This is the array of minutes (0-59) during which the process should be restarted.
-$restartMinutes = @(0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58)
+# restartMinutes = @(0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58)
 # For a single-minute restart schedule (e.g. only at minute 59), you could use:
-# $restartMinutes = @(59)
+$restartMinutes = @(59)
 
 # -------------------------------
 # FUNCTION TO LAUNCH OLLAMA PROCESS
