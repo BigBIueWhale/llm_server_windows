@@ -98,5 +98,27 @@ try {
     Show-ErrorAndWait "Error writing .username.txt. Error details: $_" "File Write Error"
 }
 
+# Add firewall rule for the Ollama executable to allow access on TCP port 11434 for both public and private networks.
+# Normally a prompt would pop up, but here ollama runs in background as SYSTEM process so there won't be any pop-up.
+$firewallRuleName = "Ollama Allow TCP 11434"
+try {
+    # Remove an existing rule with the same name if it exists.
+    Get-NetFirewallRule -DisplayName $firewallRuleName -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue
+
+    # Construct the path to the Ollama executable using the current username.
+    $ollamaExePath = "C:\Users\$currUser\AppData\Local\Programs\Ollama\ollama.exe"
+    New-NetFirewallRule -DisplayName $firewallRuleName `
+                        -Direction Inbound `
+                        -Program $ollamaExePath `
+                        -Action Allow `
+                        -Protocol TCP `
+                        -LocalPort 11434 `
+                        -Profile Private,Public `
+                        -ErrorAction Stop
+    Write-Host "Firewall rule '$firewallRuleName' created for Ollama executable."
+} catch {
+    Show-ErrorAndWait "Failed to create firewall rule for Ollama executable. Error details: $_" "Firewall Rule Error"
+}
+
 # Final confirmation to user
 Show-InfoAndWait "Installation completed successfully." "Installation Complete"

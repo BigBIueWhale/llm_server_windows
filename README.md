@@ -3,7 +3,9 @@ Turn a Windows 10/11 PC into an Ollama server that runs on startup (not on user 
 
 # Ollama Setup & Startup Scripts
 
-This project folder contains two PowerShell scripts used for installing and launching Ollama on Windows 10/11 systems. The scripts are designed to be run side-by-side and perform the following actions:
+This project folder contains two PowerShell scripts used for installing and launching Ollama on Windows 10/11 systems on startup.
+
+The [on_startup.ps1](./on_startup.ps1) script reboots ollama on set times based on `$restartMinutes = @(` variable definition. This is to increase robustness- for example: what happens when Ollama decides to use the CPU instead of GPU? The reboot makes everything work again.
 
 ## Install
 1. Download `OllamaSetup.exe` installer for Windows (I used version 0.6.5) and copy to this project root directory.
@@ -16,35 +18,16 @@ This project folder contains two PowerShell scripts used for installing and laun
 ## Uninstall
 Double-click `double_click_uninstall.bat` (requires admin privileges).
 
-## Operation
-
-- **install.ps1:**  
-  - **Admin Check:** Ensures the script is running with Administrator privileges, showing an error message box if not.
-  - **Process Termination:** Kills any running instances of `ollama.exe` and `ollama app.exe`.
-  - **Installation:** Programmatically runs `OllamaSetup.exe` (showing progress) without requiring extra user interaction.
-  - **Post-Installation Process Handling:** Waits for `ollama.exe` to start, then kills it (as well as `ollama app.exe`).
-  - **Startup Item Management:** Removes the automatically-created startup shortcut for Ollama.
-  - **Scheduled Task Creation:** Creates a scheduled task to run `on_startup.ps1` as SYSTEM on boot (before user login). This task sets its working directory to the project folder.
-  - **File Copy with Error Handling:** Copies the `.ollama` folder from the project directory to `C:\WINDOWS\system32\config\systemprofile\.ollama` (overwriting any existing copy). If an error occurs during copy, a message box notifies the user.
-  - **User Tracking:** Writes the username (of the account used for installation) to a `.username.txt` file, so that the startup script knows where Ollama was installed.
-
-- **on_startup.ps1:**  
-  - **Logging Setup:** Creates a local `logs` folder (inside the project folder) for output logs.
-  - **User Context:** Reads the username from `.username.txt` to determine the correct Ollama installation path.
-  - **Execution:** Changes directory to `C:\Users\<username>\AppData\Local\Programs\Ollama` and launches `ollama.exe serve`.
-  - **Output Redirection:** Pipes the output and error streams to a timestamped log file in the `logs` folder.
-  - **Error Logging:** Any error encountered before the main log file is set up is written into a temporary fallback log file at `C:\llm_log.txt`.
-  - **Kill-revive loop** For robustness, kills Ollama (attempts to kill gracefully) and relaunches it continuously forever at the configured minute(s) within the hour. Can be configured by editing `$restartMinutes = @(0)`.
-
 ## Absolute Paths & Key Directories
 
 - **Project Folder:**  
   This folder contains the following items:
   - `OllamaSetup.exe` – the installer file.
-  - `.ollama\` – the source folder to be copied.
+  - `.ollama/` – the source folder to be copied.
   - `install.ps1` – installer script.
   - `on_startup.ps1` – startup script.
   - `.username.txt` – created during installation, used to record the install user.
+  - `logs/` - created by `on_startup.ps1`, various debug prints of the ollama process, and of the powershell script itself.
 
 - **SYSTEM Profile Folder:**  
   The content of `.ollama\` is copied to the SYSTEM profile at:
