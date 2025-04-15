@@ -1,9 +1,10 @@
-# Helper function to display a message box and pause before exiting.
 function Show-ErrorAndWait {
     param(
         [string]$message,
         [string]$title = "Error"
     )
+    # Print error message to console with red text.
+    Write-Host "[$title] $message" -ForegroundColor Red
     # Load Windows.Forms if not already loaded.
     [void][Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
     [System.Windows.Forms.MessageBox]::Show($message, $title, [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
@@ -11,12 +12,14 @@ function Show-ErrorAndWait {
     exit 1
 }
 
-# Helper function to display an informational message and wait for ENTER.
 function Show-InfoAndWait {
     param(
         [string]$message,
         [string]$title = "Information"
     )
+    # Print informational message to console.
+    Write-Host "[$title] $message" -ForegroundColor Green
+    # Load Windows.Forms if not already loaded.
     [void][Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
     [System.Windows.Forms.MessageBox]::Show($message, $title, [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
     Read-Host -Prompt "Press ENTER to exit"
@@ -58,11 +61,16 @@ if (Test-Path $ollamaShortcut) {
 # The task action sets the current directory to the project folder.
 $projectPath = $PSScriptRoot
 $taskName = "OllamaOnStartup"
-$action = "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ""Set-Location '$projectPath'; & '$projectPath\on_startup.ps1'"""
-try {
-    schtasks.exe /Create /TN $taskName /SC ONSTART /RL HIGHEST /RU "SYSTEM" /TR $action /F | Out-Null
-} catch {
-    Show-ErrorAndWait "Error creating scheduled task: $_" "Task Creation Error"
+# Build the command that the scheduled task will execute.
+$cmd = "Set-Location '$projectPath'; & '$projectPath\on_startup.ps1'"
+# Note the backtick-escaped double quotes to enclose the command properly.
+$action = "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command `"$cmd`""
+Write-Host "Creating scheduled task..."
+# Execute schtasks.exe and capture output, including error messages.
+$taskResult = schtasks.exe /Create /TN $taskName /SC ONSTART /RL HIGHEST /RU "SYSTEM" /TR $action /F 2>&1
+# Check the return code and display error if the task creation failed.
+if ($LASTEXITCODE -ne 0) {
+    Show-ErrorAndWait "Error creating scheduled task. Exit code: $LASTEXITCODE. Output: $taskResult" "Task Creation Error"
 }
 
 # Copy the ".ollama" folder to "C:\WINDOWS\system32\config\systemprofile\.ollama"
