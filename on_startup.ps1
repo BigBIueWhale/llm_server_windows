@@ -27,6 +27,9 @@ Set-Location $ollamaPath
 $timestamp = Get-Date -Format "yyyy_MM_dd_HH_mm_ss"
 $logFile = Join-Path $logDir "$timestamp.log"
 
-# Launch "ollama.exe serve" while redirecting all output to the log file.
-# Here we use cmd.exe to perform redirection.
-Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "ollama.exe serve > `"$logFile`" 2>&1" -NoNewWindow
+# Prepare a command that explicitly sets OLLAMA_HOST in the cmd.exe environment,
+# then starts the server and redirects all output to a log file.
+$cmd = 'set OLLAMA_HOST=0.0.0.0 && ollama.exe serve > "' + $logFile + '" 2>&1'
+
+# Launch "cmd.exe" with our command.
+Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $cmd -NoNewWindow
