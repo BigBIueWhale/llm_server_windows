@@ -11,10 +11,23 @@ if (-not (Test-Path $logDir)) {
     New-Item -Path $logDir -ItemType Directory | Out-Null
 }
 
+# Create on_startup log file with a unique timestamp.
+$onStartupLogFile = Join-Path $logDir ("on_startup_" + (Get-Date -Format "yyyy_MM_dd_HH_mm_ss") + ".log")
+
+# Define a function to log messages instead of printing to the console.
+function Write-Log {
+    param([string]$msg)
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    "$timestamp - $msg" | Out-File -FilePath $onStartupLogFile -Append
+}
+
+# Log startup message.
+Write-Log "Startup script initiated."
+
 # Read the username from .username.txt to determine which user's installation to use.
 $usernameFile = Join-Path $scriptDir ".username.txt"
 if (-not (Test-Path $usernameFile)) {
-    Write-Error ".username.txt file not found in script directory."
+    Write-Log "ERROR: .username.txt file not found in script directory."
     exit 1
 }
 $username = Get-Content $usernameFile -ErrorAction Stop
@@ -22,10 +35,11 @@ $username = Get-Content $usernameFile -ErrorAction Stop
 # Change the location to the installed Ollama directory.
 $ollamaPath = "C:\Users\$username\AppData\Local\Programs\Ollama"
 if (-not (Test-Path $ollamaPath)) {
-    Write-Error "Ollama installation directory not found: $ollamaPath"
+    Write-Log "ERROR: Ollama installation directory not found: $ollamaPath"
     exit 1
 }
 Set-Location $ollamaPath
+Write-Log "Changed directory to Ollama installation: $ollamaPath"
 
 # *******************************
 # CONFIGURATION
@@ -35,64 +49,36 @@ $restartMinutes = @(0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 3
 # For a single-minute restart schedule (e.g. only at minute 59), you could use:
 # $restartMinutes = @(59)
 
-# ------------------------------------
-# DEFINE HELPER FUNCTIONALITY
-# ------------------------------------
-
-# Add a C# type that exposes GenerateConsoleCtrlEvent, which we need to simulate CTRL+C.
-Add-Type -TypeDefinition @"
-using System;
-using System.Runtime.InteropServices;
-public static class ConsoleCtrlHelper {
-    public const uint CTRL_C_EVENT = 0;
-    [DllImport("kernel32.dll", SetLastError=true)]
-    public static extern bool GenerateConsoleCtrlEvent(uint dwCtrlEvent, uint dwProcessGroupId);
-}
-"@
-
-# Function to send the CTRL+C signal to a given process (assumed to be in its own process group)
-function Send-CtrlC {
-    param(
-        [System.Diagnostics.Process]$Process
-    )
-    if ($Process -and -not $Process.HasExited) {
-        Write-Output "Sending CTRL+C to process group with ID: $($Process.Id)"
-        # Note: The second parameter is the process group ID.
-        [ConsoleCtrlHelper]::GenerateConsoleCtrlEvent([ConsoleCtrlHelper]::CTRL_C_EVENT, [uint32]$Process.Id) | Out-Null
-    }
-}
-
-# Function to launch the Ollama process.
-# It builds a log file name, builds a command that sets the OLLAMA_HOST variable, and runs the service.
-# It returns an object containing both the Process and the log file name.
+# -------------------------------
+# FUNCTION TO LAUNCH OLLAMA PROCESS
+# -------------------------------
 function Start-Ollama {
     # Create a log file for the new process run based on a timestamp.
     $timestamp = Get-Date -Format "yyyy_MM_dd_HH_mm_ss"
-    $logFile = Join-Path $logDir "$timestamp.log"
+    $ollamaLogFile = Join-Path $logDir ("ollama_" + $timestamp + ".log")
     
-    # Prepare a command that sets OLLAMA_HOST and starts the server, redirecting output to the log file.
-    $cmd = 'set OLLAMA_HOST=0.0.0.0 && ollama.exe serve > "' + $logFile + '" 2>&1'
-    Write-Output "Launching CMD process at $(Get-Date) with log file: $logFile"
+    Write-Log "Launching CMD process at $(Get-Date) with ollama log file: $ollamaLogFile"
     
-    # Create a ProcessStartInfo to run cmd.exe with the desired command.
+    # Prepare a command that sets OLLAMA_HOST and starts the server, redirecting output to the ollama log file.
+    $cmd = 'set OLLAMA_HOST=0.0.0.0 && ollama.exe serve > "' + $ollamaLogFile + '" 2>&1'
+    
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = "cmd.exe"
-    # Running with /c will execute the command and then exit.
     $psi.Arguments = "/c $cmd"
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
     
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $psi
+    
     if ($process.Start()) {
-        # NOTE: For GenerateConsoleCtrlEvent to target only this process, it must be in its own process group.
-        # This script assumes that the new process group ID is the same as the process ID.
         return [PSCustomObject]@{
             Process = $process
-            LogFile = $logFile
+            LogFile = $ollamaLogFile
         }
     }
     else {
+        Write-Log "ERROR: Failed to start ollama process."
         throw "Failed to start process"
     }
 }
@@ -114,41 +100,64 @@ while ($true) {
 
     # Check if the current minute is in our restart schedule and hasn't been processed yet.
     if ($restartMinutes -contains $currentMinute -and $currentMinute -ne $lastRestartedMinute) {
-        Write-Output "[$(Get-Date)] Restart scheduled at minute $currentMinute. Preparing to restart process..."
+        Write-Log "Restart scheduled at minute $currentMinute. Preparing to restart process..."
 
-        try {
-            if (-not $cmdProcessObj.Process.HasExited) {
-                # Attempt a graceful shutdown: send CTRL+C
-                Send-CtrlC -Process $cmdProcessObj.Process
+        # -------------------------------
+        # TERMINATE EXISTING PROCESSES USING windows_pkill.ps1
+        # -------------------------------
+        $killScript = Join-Path $scriptDir "windows_pkill.ps1"
+        if (-not (Test-Path $killScript)) {
+            Write-Log "Kill script windows_pkill.ps1 not found in $scriptDir. Skipping kill step."
+        } else {
+            # Kill the CMD process that was started.
+            Write-Log "Killing CMD process with PID $($cmdProcessObj.Process.Id) using windows_pkill.ps1"
+            
+            $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+            $pinfo.FileName = "powershell.exe"
+            $pinfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$killScript`" -ptokill $($cmdProcessObj.Process.Id) -waitTimeout 30000"
+            $pinfo.RedirectStandardOutput = $true
+            $pinfo.RedirectStandardError = $true
+            $pinfo.UseShellExecute = $false
 
-                # Wait until the process exits or up to 30 seconds, checking every second.
-                $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-                while (-not $cmdProcessObj.Process.HasExited -and $stopwatch.Elapsed.TotalSeconds -lt 30) {
-                    Start-Sleep -Seconds 1
-                }
+            $p = New-Object System.Diagnostics.Process
+            $p.StartInfo = $pinfo
+            $p.Start() | Out-Null
+            $p.WaitForExit()
 
-                if (-not $cmdProcessObj.Process.HasExited) {
-                    Write-Output "Process did not exit gracefully within 30 seconds. Logging timeout error..."
-                    # Append timeout error message to the current (most recent) log file.
-                    Add-Content -Path $cmdProcessObj.LogFile -Value "$(Get-Date) Timeout error: Process did not exit gracefully after CTRL+C."
+            $output = $p.StandardOutput.ReadToEnd()
+            $output += $p.StandardError.ReadToEnd()
+            $output | Out-File $onStartupLogFile -Append
+
+            # Also, kill any lingering ollama.exe processes.
+            $ollamaProcs = Get-Process -Name "ollama" -ErrorAction SilentlyContinue
+            if ($ollamaProcs) {
+                foreach ($proc in $ollamaProcs) {
+                    Write-Log "Killing ollama.exe process with PID $($proc.Id) using windows_pkill.ps1"
                     
-                    # Force-kill the process.
-                    $cmdProcessObj.Process.Kill()
-                    Write-Output "Process killed forcefully after timeout."
-                    
-                    # Wait an additional 30 seconds before relaunching.
-                    Start-Sleep -Seconds 30
+                    $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+                    $pinfo.FileName = "powershell.exe"
+                    $pinfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$killScript`" -ptokill $($proc.Id) -waitTimeout 30000"
+                    $pinfo.RedirectStandardOutput = $true
+                    $pinfo.RedirectStandardError = $true
+                    $pinfo.UseShellExecute = $false
+
+                    $p = New-Object System.Diagnostics.Process
+                    $p.StartInfo = $pinfo
+                    $p.Start() | Out-Null
+                    $p.WaitForExit()
+
+                    $output = $p.StandardOutput.ReadToEnd()
+                    $output += $p.StandardError.ReadToEnd()
+                    $output | Out-File $onStartupLogFile -Append
                 }
-                else {
-                    Write-Output "Process exited gracefully."
-                }
+            } else {
+                Write-Log "No ollama.exe processes found to kill."
             }
         }
-        catch {
-            Write-Output "Warning: An error occurred while trying to gracefully terminate the process: $_"
-        }
 
-        # Relaunch the process.
+        # -------------------------------
+        # RELAUNCH THE OLLAMA PROCESS
+        # -------------------------------
         $cmdProcessObj = Start-Ollama
 
         # Update the last restarted minute to avoid duplicate restarts during the same minute.
