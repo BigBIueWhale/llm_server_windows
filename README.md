@@ -1,11 +1,15 @@
 # LLM Server Windows 10/11
 Turn a Windows 10/11 PC into an Ollama server that runs on startup (not on user login).
 
+To be used as a reliable endpoint for https://github.com/BigBIueWhale/ollama_load_balancer/
+
 # Ollama Setup & Startup Scripts
 
-This project folder contains two PowerShell scripts used for installing and launching Ollama on Windows 10/11 systems on startup.
+This project is based on two fundamental scripts.
 
-The [on_startup.ps1](./on_startup.ps1) script reboots ollama on set times based on `$restartMinutes = @(` variable definition. This is to increase robustness- for example: what happens when Ollama decides to use the CPU instead of GPU? The reboot makes everything work again.
+1. [double_click_install.bat](./double_click_install.bat) to install and configure Ollama, setup firewall rule, and create startup item to run [on_startup.ps1](./on_startup.ps1) on boot - running as SYSTEM user.
+
+2. [on_startup.ps1](./on_startup.ps1) script launches Ollama then reboots ollama on set times based on `$restartMinutes = @(` variable definition. This is to increase robustness- for example: what happens when Ollama decides to use the CPU instead of GPU? The reboot makes everything work again.
 
 ## Install
 1. Download `OllamaSetup.exe` installer for Windows (I used version 0.6.5) and copy to this project root directory.
@@ -17,6 +21,17 @@ The [on_startup.ps1](./on_startup.ps1) script reboots ollama on set times based 
 
 ## Uninstall
 Double-click `double_click_uninstall.bat` (requires admin privileges).
+
+## Security
+This project is not secure at all, for multiple reasons:
+
+1. [on_startup.ps1](./on_startup.ps1) will run as SYSTEM user- which means Ollama itself will run as admin. This is a workaround for the reality that the PC might not automatically log in- the we want the Ollama server to continue running reliably in the background.
+
+2. [on_startup.ps1](./on_startup.ps1) will possibly exist in a user-accessible folder that a non-admin can edit to contain arbitrary code.
+
+3. The Ollama installation itself it for the current user (because that's how Ollama works), but then it's executed as admin. Normally such programs should be installed as admin globally so that the EXEs and DLLs can't be modified by a non-admin.
+
+4. Firewall rule that's added points to the `ollama.exe` file in the local user folder, which can be replaced (by a non-admin) with a malicious executable which now has access to listen on all interfaces on TCP port 11434.
 
 ## Absolute Paths & Key Directories
 
