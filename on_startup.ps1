@@ -56,22 +56,22 @@ function Start-Ollama {
     # Create a log file for the new process run based on a timestamp.
     $timestamp = Get-Date -Format "yyyy_MM_dd_HH_mm_ss"
     $ollamaLogFile = Join-Path $logDir ("ollama_" + $timestamp + ".log")
-    
+
     Write-Log "Launching CMD process at $(Get-Date) with ollama log file: $ollamaLogFile"
-    
+
     # Prepare a command that sets OLLAMA_HOST and starts the server, redirecting output to the ollama log file.
     $cmd = 'set OLLAMA_HOST=0.0.0.0 && ollama.exe serve > "' + $ollamaLogFile + '" 2>&1'
-    
+
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = "cmd.exe"
     $psi.Arguments = "/c $cmd"
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
     $psi.WorkingDirectory = $ollamaPath
-    
+
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $psi
-    
+
     if ($process.Start()) {
         return [PSCustomObject]@{
             Process = $process
@@ -89,8 +89,10 @@ function Start-Ollama {
 # -------------------------------
 $cmdProcessObj = Start-Ollama
 
-# To prevent repeatedly restarting within the same minute, store the last processed minute.
-$lastRestartedMinute = -1
+# Track the last minute we checked. Initialize to -1 to ensure the first check runs.
+$lastCheckedMinute = -1
+# Flag to track if a restart has already happened within the current minute.
+$restartedThisMinute = $false
 
 # -------------------------------
 # MAIN LOOP
@@ -99,9 +101,16 @@ while ($true) {
     # Get the current minute (0-59) from local time.
     $currentMinute = (Get-Date).Minute
 
-    # Check if the current minute is in our restart schedule and hasn't been processed yet.
-    if ($restartMinutes -contains $currentMinute -and $currentMinute -ne $lastRestartedMinute) {
-        Write-Log "Restart scheduled at minute $currentMinute. Preparing to restart process..."
+    # Reset the restart flag if the minute has changed since the last check.
+    if ($currentMinute -ne $lastCheckedMinute) {
+        $restartedThisMinute = $false
+        $lastCheckedMinute = $currentMinute
+    }
+
+    # Check if the current minute is in our restart schedule AND we haven't already restarted in this specific minute.
+    if ($restartMinutes -contains $currentMinute -and $restartedThisMinute -eq $false) {
+        $restartedThisMinute = $true
+        Write-Log "Restart triggered at minute $currentMinute. Preparing to restart process..."
 
         # -------------------------------
         # TERMINATE EXISTING PROCESSES USING windows_pkill.ps1
@@ -112,7 +121,7 @@ while ($true) {
         } else {
             # Kill the CMD process that was started.
             Write-Log "Killing CMD process with PID $($cmdProcessObj.Process.Id) using windows_pkill.ps1"
-            
+
             $pinfo = New-Object System.Diagnostics.ProcessStartInfo
             $pinfo.FileName = "powershell.exe"
             $pinfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$killScript`" -ptokill $($cmdProcessObj.Process.Id) -waitTimeout 30000"
@@ -134,7 +143,7 @@ while ($true) {
             if ($ollamaProcs) {
                 foreach ($proc in $ollamaProcs) {
                     Write-Log "Killing ollama.exe process with PID $($proc.Id) using windows_pkill.ps1"
-                    
+
                     $pinfo = New-Object System.Diagnostics.ProcessStartInfo
                     $pinfo.FileName = "powershell.exe"
                     $pinfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$killScript`" -ptokill $($proc.Id) -waitTimeout 30000"
@@ -162,7 +171,7 @@ while ($true) {
         $cmdProcessObj = Start-Ollama
 
         # Update the last restarted minute to avoid duplicate restarts during the same minute.
-        $lastRestartedMinute = $currentMinute
+        $lastRestartedMinute = $currentMinute        
     }
 
     # Poll every second.
