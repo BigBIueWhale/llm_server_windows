@@ -14,7 +14,7 @@ This project is based on two fundamental scripts.
 ## Install
 1. Download `OllamaSetup.exe` installer for Windows (I used version 0.6.5) and copy to this project root directory.
 2. Install Ollama manually on an online PC (or virtual machine).
-3. Run `ollama pull qwq:9b` on the online PC.
+3. Run `ollama pull qwq:32b` (for example) on the online PC.
 4. Copy the created `C:/Users/{USERNAME}/.ollama` into this project root directory.
 5. Double-click `double_click_install.bat` and agree to admin request. Now Ollama will run on startup.
 6. Don't move this project directory anywhere else, because then the startup item will stop working.
