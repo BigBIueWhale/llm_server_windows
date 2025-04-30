@@ -12,7 +12,7 @@ This project is based on two fundamental scripts.
 2. [on_startup.ps1](./on_startup.ps1) script launches Ollama then reboots ollama on set times based on `$restartMinutes = @(` variable definition. This is to increase robustness- for example: what happens when Ollama decides to use the CPU instead of GPU? The reboot makes everything work again.
 
 ## Install
-1. Download `OllamaSetup.exe` installer for Windows (I used version 0.6.5) and copy to this project root directory.
+1. Download `OllamaSetup.exe` installer for Windows (I used version 0.6.6) and copy to this project root directory.
 2. Install Ollama manually on an online PC (or virtual machine).
 3. Run `ollama pull qwq:32b` (for example) on the online PC.
 4. Copy the created `C:/Users/{USERNAME}/.ollama` into this project root directory.
