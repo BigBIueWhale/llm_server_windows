@@ -121,30 +121,23 @@ while ($true) {
             Write-Log "Kill script windows_pkill.ps1 not found in $scriptDir. Skipping kill step."
         } else {
             # Kill the CMD process that was started.
-            # Check if the process object and its Id property are valid before attempting to kill
-            if ($null -ne $cmdProcessObj -and $null -ne $cmdProcessObj.Process -and $null -ne $cmdProcessObj.Process.Id) {
-                Write-Log "Killing CMD process with PID $($cmdProcessObj.Process.Id) using windows_pkill.ps1"
+            Write-Log "Killing CMD process with PID $($cmdProcessObj.Process.Id) using windows_pkill.ps1"
 
-                $pinfo = New-Object System.Diagnostics.ProcessStartInfo
-                $pinfo.FileName = "powershell.exe"
-                # Ensure the kill script path is correctly quoted
-                $pinfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$killScript`" -ptokill $($cmdProcessObj.Process.Id) -waitTimeout 30000"
-                $pinfo.RedirectStandardOutput = $true
-                $pinfo.RedirectStandardError = $true
-                $pinfo.UseShellExecute = $false
+            $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+            $pinfo.FileName = "powershell.exe"
+            $pinfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$killScript`" -ptokill $($cmdProcessObj.Process.Id) -waitTimeout 30000"
+            $pinfo.RedirectStandardOutput = $true
+            $pinfo.RedirectStandardError = $true
+            $pinfo.UseShellExecute = $false
 
-                $p = New-Object System.Diagnostics.Process
-                $p.StartInfo = $pinfo
-                $p.Start() | Out-Null
-                $p.WaitForExit()
+            $p = New-Object System.Diagnostics.Process
+            $p.StartInfo = $pinfo
+            $p.Start() | Out-Null
+            $p.WaitForExit()
 
-                $output = $p.StandardOutput.ReadToEnd()
-                $output += $p.StandardError.ReadToEnd()
-                $output | Out-File $onStartupLogFile -Append
-            } else {
-                 Write-Log "CMD process object or PID is null. Cannot kill process."
-            }
-
+            $output = $p.StandardOutput.ReadToEnd()
+            $output += $p.StandardError.ReadToEnd()
+            $output | Out-File $onStartupLogFile -Append
 
             # Also, kill any lingering ollama.exe processes.
             $ollamaProcs = Get-Process -Name "ollama" -ErrorAction SilentlyContinue
@@ -154,7 +147,6 @@ while ($true) {
 
                     $pinfo = New-Object System.Diagnostics.ProcessStartInfo
                     $pinfo.FileName = "powershell.exe"
-                    # Ensure the kill script path is correctly quoted
                     $pinfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$killScript`" -ptokill $($proc.Id) -waitTimeout 30000"
                     $pinfo.RedirectStandardOutput = $true
                     $pinfo.RedirectStandardError = $true
@@ -177,12 +169,9 @@ while ($true) {
         # -------------------------------
         # RELAUNCH THE OLLAMA PROCESS
         # -------------------------------
-        $cmdProcessObj = Start-Ollama
-        # No need to update a 'lastRestartedHour' as the $restartedThisHour flag handles preventing immediate re-restart.
+        $cmdProcessObj = Start-Ollama   
     }
 
-    # Poll every second. Adjust sleep time if less frequent checks are needed.
-    # Checking every second might be excessive if restarts only happen hourly.
-    # Consider sleeping longer, e.g., 60 seconds, to reduce resource usage.
+    # Poll every second.
     Start-Sleep -Seconds 1
 }
