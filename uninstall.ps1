@@ -43,16 +43,36 @@ if ($LastExitCode -ne 0) {
 
 # Kill any running instances of "ollama.exe" and "ollama app.exe".
 try {
-    Get-Process -Name "ollama" -ErrorAction SilentlyContinue | ForEach-Object { 
-        Stop-Process $_.Id -Force -ErrorAction Stop 
+    Get-Process -Name "ollama" -ErrorAction SilentlyContinue | ForEach-Object {
+        Stop-Process $_.Id -Force -ErrorAction Stop
         Write-Host "Stopped process: $($_.Id)"
     }
-    Get-Process -Name "ollama app" -ErrorAction SilentlyContinue | ForEach-Object { 
-        Stop-Process $_.Id -Force -ErrorAction Stop 
+    Get-Process -Name "ollama app" -ErrorAction SilentlyContinue | ForEach-Object {
+        Stop-Process $_.Id -Force -ErrorAction Stop
         Write-Host "Stopped process: $($_.Id)"
     }
 } catch {
     Log-Error "Error stopping one or more processes: $_" "Process Termination Error"
+}
+
+# --- Firewall Rule Removal ---
+# Remove the firewall rule created during installation.
+$firewallRuleName = "Ollama Allow TCP 11434"
+if ($isAdmin) {
+    Write-Host "Attempting to remove firewall rule '$firewallRuleName'..."
+    try {
+        $rule = Get-NetFirewallRule -DisplayName $firewallRuleName -ErrorAction SilentlyContinue
+        if ($rule) {
+            Remove-NetFirewallRule -DisplayName $firewallRuleName -ErrorAction Stop
+            Write-Host "Firewall rule '$firewallRuleName' removed successfully."
+        } else {
+            Write-Host "Firewall rule '$firewallRuleName' not found. Skipping removal."
+        }
+    } catch {
+        Log-Error "Error removing firewall rule '$firewallRuleName'. Error details: $_" "Firewall Rule Error"
+    }
+} else {
+    Write-Host "Skipping firewall rule removal because the script is not running as Administrator." -ForegroundColor Yellow
 }
 
 # Remove the startup shortcut, if it exists.
