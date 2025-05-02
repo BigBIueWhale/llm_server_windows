@@ -9,7 +9,7 @@ This project is based on two fundamental scripts.
 
 1. [double_click_install.bat](./double_click_install.bat) to install and configure Ollama, setup firewall rule, and create startup item to run [on_startup.ps1](./on_startup.ps1) on boot - running as SYSTEM user.
 
-2. [on_startup.ps1](./on_startup.ps1) script launches Ollama then reboots ollama on set times based on `$restartMinutes = @(` variable definition. This is to increase robustness- for example: what happens when Ollama decides to use the CPU instead of GPU? The reboot makes everything work again.
+2. [on_startup.ps1](./on_startup.ps1) script launches Ollama then reboots ollama on set times based on `$restartHours = @(` variable definition. This is to increase robustness- for example: what happens when Ollama has memory leaks that accumulate over time?
 
 ## Install
 1. Download `OllamaSetup.exe` installer for Windows (I used version 0.6.7) and copy to this project root directory.
