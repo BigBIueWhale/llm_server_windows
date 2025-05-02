@@ -44,10 +44,11 @@ Write-Log "Changed directory to Ollama installation: $ollamaPath"
 # *******************************
 # CONFIGURATION
 # *******************************
-# This is the array of minutes (0-59) during which the process should be restarted.
-# restartMinutes = @(0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58)
-# For a single-minute restart schedule (e.g. only at minute 59), you could use:
-$restartMinutes = @(59)
+# This is the array of hours (0-23, military time) during which the process should be restarted.
+# Example: Restart at midnight, noon, 1 PM, and 11 PM.
+# $restartHours = @(0, 12, 13, 23)
+# For a single-hour restart schedule (e.g. only at 5 A.M), you could use:
+$restartHours = @(5)
 
 # -------------------------------
 # FUNCTION TO LAUNCH OLLAMA PROCESS
@@ -89,28 +90,28 @@ function Start-Ollama {
 # -------------------------------
 $cmdProcessObj = Start-Ollama
 
-# Track the last minute we checked. Initialize to -1 to ensure the first check runs.
-$lastCheckedMinute = -1
-# Flag to track if a restart has already happened within the current minute.
-$restartedThisMinute = $false
+# Track the last hour we checked. Initialize to -1 to ensure the first check runs.
+$lastCheckedHour = -1
+# Flag to track if a restart has already happened within the current hour.
+$restartedThisHour = $false
 
 # -------------------------------
 # MAIN LOOP
 # -------------------------------
 while ($true) {
-    # Get the current minute (0-59) from local time.
-    $currentMinute = (Get-Date).Minute
+    # Get the current hour (0-23) from local time.
+    $currentHour = (Get-Date).Hour
 
-    # Reset the restart flag if the minute has changed since the last check.
-    if ($currentMinute -ne $lastCheckedMinute) {
-        $restartedThisMinute = $false
-        $lastCheckedMinute = $currentMinute
+    # Reset the restart flag if the hour has changed since the last check.
+    if ($currentHour -ne $lastCheckedHour) {
+        $restartedThisHour = $false
+        $lastCheckedHour = $currentHour
     }
 
-    # Check if the current minute is in our restart schedule AND we haven't already restarted in this specific minute.
-    if ($restartMinutes -contains $currentMinute -and $restartedThisMinute -eq $false) {
-        $restartedThisMinute = $true
-        Write-Log "Restart triggered at minute $currentMinute. Preparing to restart process..."
+    # Check if the current hour is in our restart schedule AND we haven't already restarted in this specific hour.
+    if ($restartHours -contains $currentHour -and $restartedThisHour -eq $false) {
+        $restartedThisHour = $true # Set the flag to prevent multiple restarts in the same hour
+        Write-Log "Restart triggered at hour $currentHour. Preparing to restart process..."
 
         # -------------------------------
         # TERMINATE EXISTING PROCESSES USING windows_pkill.ps1
@@ -120,23 +121,30 @@ while ($true) {
             Write-Log "Kill script windows_pkill.ps1 not found in $scriptDir. Skipping kill step."
         } else {
             # Kill the CMD process that was started.
-            Write-Log "Killing CMD process with PID $($cmdProcessObj.Process.Id) using windows_pkill.ps1"
+            # Check if the process object and its Id property are valid before attempting to kill
+            if ($null -ne $cmdProcessObj -and $null -ne $cmdProcessObj.Process -and $null -ne $cmdProcessObj.Process.Id) {
+                Write-Log "Killing CMD process with PID $($cmdProcessObj.Process.Id) using windows_pkill.ps1"
 
-            $pinfo = New-Object System.Diagnostics.ProcessStartInfo
-            $pinfo.FileName = "powershell.exe"
-            $pinfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$killScript`" -ptokill $($cmdProcessObj.Process.Id) -waitTimeout 30000"
-            $pinfo.RedirectStandardOutput = $true
-            $pinfo.RedirectStandardError = $true
-            $pinfo.UseShellExecute = $false
+                $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+                $pinfo.FileName = "powershell.exe"
+                # Ensure the kill script path is correctly quoted
+                $pinfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$killScript`" -ptokill $($cmdProcessObj.Process.Id) -waitTimeout 30000"
+                $pinfo.RedirectStandardOutput = $true
+                $pinfo.RedirectStandardError = $true
+                $pinfo.UseShellExecute = $false
 
-            $p = New-Object System.Diagnostics.Process
-            $p.StartInfo = $pinfo
-            $p.Start() | Out-Null
-            $p.WaitForExit()
+                $p = New-Object System.Diagnostics.Process
+                $p.StartInfo = $pinfo
+                $p.Start() | Out-Null
+                $p.WaitForExit()
 
-            $output = $p.StandardOutput.ReadToEnd()
-            $output += $p.StandardError.ReadToEnd()
-            $output | Out-File $onStartupLogFile -Append
+                $output = $p.StandardOutput.ReadToEnd()
+                $output += $p.StandardError.ReadToEnd()
+                $output | Out-File $onStartupLogFile -Append
+            } else {
+                 Write-Log "CMD process object or PID is null. Cannot kill process."
+            }
+
 
             # Also, kill any lingering ollama.exe processes.
             $ollamaProcs = Get-Process -Name "ollama" -ErrorAction SilentlyContinue
@@ -146,6 +154,7 @@ while ($true) {
 
                     $pinfo = New-Object System.Diagnostics.ProcessStartInfo
                     $pinfo.FileName = "powershell.exe"
+                    # Ensure the kill script path is correctly quoted
                     $pinfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$killScript`" -ptokill $($proc.Id) -waitTimeout 30000"
                     $pinfo.RedirectStandardOutput = $true
                     $pinfo.RedirectStandardError = $true
@@ -169,11 +178,11 @@ while ($true) {
         # RELAUNCH THE OLLAMA PROCESS
         # -------------------------------
         $cmdProcessObj = Start-Ollama
-
-        # Update the last restarted minute to avoid duplicate restarts during the same minute.
-        $lastRestartedMinute = $currentMinute        
+        # No need to update a 'lastRestartedHour' as the $restartedThisHour flag handles preventing immediate re-restart.
     }
 
-    # Poll every second.
+    # Poll every second. Adjust sleep time if less frequent checks are needed.
+    # Checking every second might be excessive if restarts only happen hourly.
+    # Consider sleeping longer, e.g., 60 seconds, to reduce resource usage.
     Start-Sleep -Seconds 1
 }
