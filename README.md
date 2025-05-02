@@ -61,19 +61,3 @@ This project is not secure at all, for multiple reasons:
   ```
   C:\llm_log.txt
   ```
-
-## Important Notes
-
-- **Administrator Requirements:**  
-  `install.ps1` must be run as an Administrator; otherwise, it will display an error message and exit.
-
-- **Scheduled Task:**  
-  The scheduled task created will run as SYSTEM at boot (before any user logs in). Be sure this behavior suits your environment.
-
-- **Error Handling:**  
-  Errors in critical operations (like copying folders or launching processes) will cause the scripts to fail. In `install.ps1`, errors produce message boxes to alert the user; in `on_startup.ps1`, errors are logged to `C:\llm_log.txt`.
-
-- **Testing:**  
-  It is highly recommended to test these scripts in a controlled environment before deploying them in production.
-
----
