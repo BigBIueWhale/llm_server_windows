@@ -61,7 +61,7 @@ function Start-Ollama {
     Write-Log "Launching CMD process at $(Get-Date) with ollama log file: $ollamaLogFile"
 
     # Prepare a command that sets OLLAMA_HOST and starts the server, redirecting output to the ollama log file.
-    $cmd = 'set OLLAMA_HOST=0.0.0.0 && set OLLAMA_KEEP_ALIVE=0 && ollama.exe serve > "' + $ollamaLogFile + '" 2>&1'
+    $cmd = 'set OLLAMA_HOST=0.0.0.0 && set OLLAMA_KEEP_ALIVE=0 && set OLLAMA_FLASH_ATTENTION=1 && set OLLAMA_KV_CACHE_TYPE=q8_0 && ollama.exe serve > "' + $ollamaLogFile + '" 2>&1'
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = "cmd.exe"
