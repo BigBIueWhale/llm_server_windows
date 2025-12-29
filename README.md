@@ -24,6 +24,81 @@ This project is based on two fundamental scripts.
 ## Uninstall
 Double-click `double_click_uninstall.bat` (requires admin privileges).
 
+## Update Ollama (Windows 10/11) - ADHD-Friendly Guide
+
+### Understand What You're Updating
+
+**The "product" is THIS PROJECT FOLDER.** It contains the service that manages Ollama.
+
+**This folder must live at:** `C:\Users\{YourUsername}\Documents\llm_server_windows\` (or any permanent path you choose, but NEVER move it after installation)
+
+**What's in this folder:**
+- Scripts that run Ollama as a service (`install.ps1`, `on_startup.ps1`, etc.)
+- `.ollama/` folder with your downloaded models (~20-60GB)
+- `OllamaSetup.exe` (the Ollama installer you download)
+- `.username.txt` (created during install, tracks which user installed)
+
+**What gets installed where:**
+1. **Ollama app** → `C:\Users\{YourUsername}\AppData\Local\Programs\Ollama\` (installed for the user running the install script)
+2. **Models copy** → `C:\WINDOWS\system32\config\systemprofile\.ollama` (copied from `.ollama/` in project folder)
+3. **Scheduled task** → Runs `on_startup.ps1` from THIS folder at boot as SYSTEM user, with HARDCODED absolute path (install.ps1:66)
+
+**Admin requirements:**
+- **Install/Uninstall:** MUST run as admin (creates scheduled task, modifies system folders, firewall rules)
+- **Normal operation:** Runs as SYSTEM automatically (you never touch it)
+
+**Why you CANNOT move this folder after install:** The scheduled task has `cd /d "C:\Users\...\llm_server_windows"` hardcoded (install.ps1:66). Moving folder = service looks for old path = breaks.
+
+### Update Steps (5-10 minutes, server down)
+
+**Goal:** Replace Ollama application in AppData with new version. This folder and models stay intact.
+
+**Steps (DO NOT SKIP OR REORDER):**
+
+**1. Download New Ollama**
+- https://ollama.com/download/windows → download `OllamaSetup.exe`
+- Save anywhere temporary (Downloads, Desktop)
+
+**2. Uninstall (REQUIRES ADMIN)**
+- Go to project folder: `C:\Users\{YourUsername}\Documents\llm_server_windows\`
+- Right-click `double_click_uninstall.bat` → "Run as administrator"
+- Ollama GUI uninstaller appears → complete it
+- Wait for "Uninstallation completed" popup → OK
+- **Removes:** Scheduled task (uninstall.ps1:37), firewall rule, system profile models, Ollama from AppData
+- **Keeps:** THIS folder (scripts, `.ollama/` models, `.username.txt`)
+
+**3. Replace Installer File**
+- In project folder: delete old `OllamaSetup.exe` if it exists
+- Copy NEW `OllamaSetup.exe` from Downloads → paste here (next to README.md)
+- **Why:** install.ps1:38 runs `OllamaSetup.exe` from project folder. Wrong file = wrong version.
+
+**4. Reinstall (REQUIRES ADMIN)**
+- In project folder, right-click `double_click_install.bat` → "Run as administrator"
+- Wait 2-5 minutes
+- "Installation completed successfully" popup → OK
+- **Creates:** New Ollama in AppData, scheduled task pointing to THIS folder, models copy in system profile, firewall rule, `.username.txt`
+
+**5. Reboot & Verify**
+- **Reboot Windows** (scheduled task runs at boot only)
+- After boot, wait 1 minute
+- Browser: http://localhost:11434 → "Ollama is running"
+- Command prompt: `ollama --version` → new version
+
+### Critical Rules:
+- 🔴 **NEVER move project folder after install** - scheduled task has hardcoded path
+- 🔴 **NEVER delete `.ollama/`** - your models, gets copied to system profile
+- 🔴 **NEVER delete `.username.txt`** - on_startup.ps1:28 reads it to find Ollama path
+- 🔴 **NEVER run install from different folder** - creates conflicting scheduled task
+
+### Troubleshooting:
+**Old version still shows?** You didn't delete old `OllamaSetup.exe` before step 4. Uninstall → verify deletion → reinstall.
+
+**Not running after reboot?** Task Scheduler → find `OllamaOnStartup` → check status. Task Manager → `ollama.exe` should run as "SYSTEM". Check `logs/on_startup_*.log`.
+
+**Can I move this folder?** Before install: yes. After install: no (breaks scheduled task). To move: uninstall → move → reinstall.
+
+**Can I delete this folder?** After install: no (scheduled task needs it). After uninstall: yes (but lose models).
+
 ## Security
 This project is not secure at all, for multiple reasons:
 
