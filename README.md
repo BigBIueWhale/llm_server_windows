@@ -3,6 +3,8 @@ Turn a Windows 10/11 PC into an Ollama server that runs on startup (not on user 
 
 To be used as a reliable endpoint for https://github.com/BigBIueWhale/ollama_load_balancer/
 
+**📚 [Architecture & KV Cache Control API Documentation](./ARCHITECTURE.md)**
+
 # Ollama Setup & Startup Scripts
 
 This project is based on two fundamental scripts.

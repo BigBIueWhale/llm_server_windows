@@ -60,8 +60,19 @@ function Start-Ollama {
 
     Write-Log "Launching CMD process at $(Get-Date) with ollama log file: $ollamaLogFile"
 
+    # Read KV cache type from config file
+    $configFile = Join-Path $scriptDir "kv_cache_config.txt"
+    $kvCacheType = "q8_0"  # default
+    if (Test-Path $configFile) {
+        $kvCacheType = Get-Content $configFile -Raw
+        $kvCacheType = $kvCacheType.Trim()
+        Write-Log "Using KV cache type from config: $kvCacheType"
+    } else {
+        Write-Log "Config file not found, using default KV cache type: $kvCacheType"
+    }
+
     # Prepare a command that sets OLLAMA_HOST and starts the server, redirecting output to the ollama log file.
-    $cmd = 'set OLLAMA_HOST=0.0.0.0 && set OLLAMA_KEEP_ALIVE=-1 && set OLLAMA_FLASH_ATTENTION=1 && set OLLAMA_KV_CACHE_TYPE=q8_0 && set OLLAMA_NUM_PARALLEL=1 && ollama.exe serve > "' + $ollamaLogFile + '" 2>&1'
+    $cmd = 'set OLLAMA_HOST=0.0.0.0 && set OLLAMA_KEEP_ALIVE=-1 && set OLLAMA_FLASH_ATTENTION=1 && set OLLAMA_KV_CACHE_TYPE=' + $kvCacheType + ' && set OLLAMA_NUM_PARALLEL=1 && ollama.exe serve > "' + $ollamaLogFile + '" 2>&1'
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = "cmd.exe"
@@ -90,6 +101,21 @@ function Start-Ollama {
 # -------------------------------
 $cmdProcessObj = Start-Ollama
 
+# -------------------------------
+# START API SERVICE
+# -------------------------------
+Write-Log "Starting API service on port 11435..."
+$apiScript = Join-Path $scriptDir "api_service.ps1"
+if (Test-Path $apiScript) {
+    $apiJob = Start-Job -ScriptBlock {
+        param($apiScript, $scriptDir, $logFile, $username)
+        & $apiScript -scriptDir $scriptDir -logFile $logFile -username $username
+    } -ArgumentList $apiScript, $scriptDir, $onStartupLogFile, $username
+    Write-Log "API service started as background job (Job ID: $($apiJob.Id))"
+} else {
+    Write-Log "WARNING: API service script not found at $apiScript"
+}
+
 # Track the last hour we checked. Initialize to -1 to ensure the first check runs.
 $lastCheckedHour = -1
 # Flag to track if a restart has already happened within the current hour.
@@ -99,6 +125,14 @@ $restartedThisHour = $false
 # MAIN LOOP
 # -------------------------------
 while ($true) {
+    # -------------------------------
+    # HEALTH CHECK: Restart if Ollama died
+    # -------------------------------
+    if ($cmdProcessObj.Process.HasExited) {
+        Write-Log "Detected that Ollama process (PID $($cmdProcessObj.Process.Id)) has exited. Restarting..."
+        $cmdProcessObj = Start-Ollama
+    }
+
     # Get the current hour (0-23) from local time.
     $currentHour = (Get-Date).Hour
 
